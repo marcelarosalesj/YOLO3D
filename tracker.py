@@ -74,16 +74,18 @@ def parse_opt():
     parser.add_argument('--reg_weights', type=str, default='weights/resnet18.pkl', help='Regressor model weights')
     parser.add_argument('--output_path', type=str, default=ROOT / 'runs/track', help='Save output pat')
     parser.add_argument('--video', type=str, default='testvid.mp4', help='Video file path')
+    parser.add_argument('--calib_file', type=str, default=ROOT / 'eval/camera_cal/calib_cam_to_cam.txt', help='Calibration file or path')
 
     opt = parser.parse_args()
-    opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
+    #opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
     return opt
 
 def main(filevideo, calib_file, model_select, reg_weights, output_path):
     model = YOLO('yolov8l.pt')
     video = cv2.VideoCapture(filevideo)
     frames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
-    frames = 500
+    #frames = 50
+    print(f"NUMBER OF FRAMES: {frames}")
     calib = str(calib_file)
 
     # load model
@@ -98,15 +100,17 @@ def main(filevideo, calib_file, model_select, reg_weights, output_path):
     averages = ClassAverages.ClassAverages()
     angle_bins = generate_bins(2)
 
+
+    output_video_frames = []
     # Process each frame
     for i in tqdm(range(frames), desc='Processing frames'):
+        print(f'index {i}')
         ret, frame = video.read()
 
         if not ret:
             continue
 
         results = model.track(frame, persist=True, tracker='bytetrack.yaml', classes=0, verbose=False) 
-
         # Get result values
         boxes = results[0].boxes
         track_ids = []
@@ -167,14 +171,21 @@ def main(filevideo, calib_file, model_select, reg_weights, output_path):
             # plot 3d detection
             plot3d(frame, proj_matrix, bbox, dim, alpha, theta_ray)
 
-            cv2.imshow("Person Tracking", frame)
+            #cv2.imshow("Person Tracking", frame)
             # Break the loop if 'q' is pressed
-            if cv2.waitKey(1) & 0xFF == ord("q"):
-                break
+            #if cv2.waitKey(1) & 0xFF == ord("q"):
+            #    break
 
-        print("Done")
-        print("saving to", f'{output_path}/testIMG.png')
-        cv2.imwrite(f'{output_path}/testIMG2.png', frame)
+        print("Done for img {i}")
+        #print("saving to", f'{output_path}/testIMG_{i}.png')
+        #cv2.imwrite(f'{output_path}/testIMG2_{i}.png', frame)
+        output_video_frames.append(frame)
+
+    # Save the output video
+    out = cv2.VideoWriter(f'{output_path}/output.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 15, (frame.shape[1], frame.shape[0]))
+    for frame in output_video_frames:
+        out.write(frame)
+    out.release()
 
 
 
