@@ -15,6 +15,8 @@ def get_P(calib_file):
             cam_P = np.asarray([float(cam_P) for cam_P in cam_P[1:]])
             matrix = np.zeros((3, 4))
             matrix = cam_P.reshape((3, 4))
+            print(cam_P)
+            print(matrix)
             return matrix
 
 # TODO: understand this

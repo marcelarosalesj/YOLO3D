@@ -23,6 +23,8 @@ class ClassAverages:
         if len(classes) == 0: # eval mode
             self.load_items_from_file()
 
+        print("classes", classes)
+
         for detection_class in classes:
             class_ = detection_class.lower()
             if class_ in self.dimension_map.keys():
@@ -55,6 +57,7 @@ class ClassAverages:
             dimension_map[class_]['total'] = np.asarray(dimension_map[class_]['total'])
 
         self.dimension_map = dimension_map
+        print("Loaded class averages from file", self.dimension_map)
 
     def recognized_class(self, class_):
         return class_.lower() in self.dimension_map

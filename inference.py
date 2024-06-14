@@ -90,15 +90,21 @@ def detect3d(
             data='data/coco128.yaml',
             imgsz=[640, 640],
             device=0,
-            classes=[0, 2, 3, 5]
+            classes=[0, 1, 2, 3, 5]
         )
 
         for det in dets:
+            if det.detected_class == 'person':
+                det.detected_class = 'pedestrian'
+            print("class: ", det.detected_class)
+            print("avgs: ", averages.recognized_class(det.detected_class))
+
             if not averages.recognized_class(det.detected_class):
                 continue
             try: 
                 detectedObject = DetectedObject(img, det.detected_class, det.box_2d, calib)
-            except:
+            except Exception as e:
+                print(f"Could not create the DetectedObject: {e!r}")
                 continue
 
             theta_ray = detectedObject.theta_ray
@@ -106,6 +112,7 @@ def detect3d(
             proj_matrix = detectedObject.proj_matrix
             box_2d = det.box_2d
             detected_class = det.detected_class
+            print("Detected class: ", detected_class)
 
             input_tensor = torch.zeros([1,3,224,224]).cuda()
             input_tensor[0,:,:,:] = input_img
@@ -132,13 +139,19 @@ def detect3d(
         if show_result:
             cv2.imshow('3d detection', img)
             cv2.waitKey(0)
+            cv2.imwrite(f'{output_path}/{i:03d}.png', img)
 
         if save_result and output_path is not None:
             try:
                 os.mkdir(output_path)
+                print("Directory ", output_path, " Created ")
             except:
                 pass
+            print("output path", output_path)
+            print(f"Saving image {i:03d}...")
             cv2.imwrite(f'{output_path}/{i:03d}.png', img)
+
+    print("DONE")
 
 @torch.no_grad()
 def detect2d(
@@ -215,6 +228,8 @@ def detect2d(
                     bbox = [top_left, bottom_right]
                     c = int(cls)  # integer class
                     label = names[c]
+                    print("bbox2d", bbox, label)
+                    cv2.rectangle(im0, top_left, bottom_right, (0, 255, 0), 2)
 
                     bbox_list.append(Bbox(bbox, label))
 
@@ -223,7 +238,7 @@ def detect2d(
 
     # Print results
     t = tuple(x / seen * 1E3 for x in dt)  # speeds per image
-    LOGGER.info(f'Speed: %.1fms pre-process, %.1fms inference, %.1fms NMS per image at shape {(1, 3, *imgsz)}' % t)
+    # LOGGER.info(f'Speed: %.1fms pre-process, %.1fms inference, %.1fms NMS per image at shape {(1, 3, *imgsz)}' % t)
 
     return bbox_list
 
