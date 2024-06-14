@@ -13,3 +13,8 @@ python inference.py --weights yolov5s.pt --source  eval/parque_1080/ --reg_weigh
 # Va a correr el tracker sobre `testvid.mp4`
 python tracker.py --output_path=runs/
 ```
+
+
+
+Aqui encontre informacion adicional sobre motocicleta y autobus
+https://github.com/patrickcho168/3dbb/blob/master/torch_lib/class_averages.txt

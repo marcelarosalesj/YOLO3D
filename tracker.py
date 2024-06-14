@@ -110,7 +110,23 @@ def main(filevideo, calib_file, model_select, reg_weights, output_path):
         if not ret:
             continue
 
-        results = model.track(frame, persist=True, tracker='bytetrack.yaml', classes=0, verbose=False) 
+        labels_map = {
+            0: "pedestrian",
+            #1: "bicycle",
+            1: "cyclist", # changed to cyclist
+            2: "car",
+            3: "motorcycle",
+            5: "bus",
+            #6: "train",
+            6: "tram", # changed to tram
+            7: "truck",
+            #9: "traffic light",
+            #10: "fire hydrant",
+            #11: "stop sign",
+            #12: "parking meter",
+            #13: "bench"
+        }
+        results = model.track(frame, persist=True, tracker='bytetrack.yaml', classes=[*labels_map], verbose=False)
         # Get result values
         boxes = results[0].boxes
         track_ids = []
@@ -131,7 +147,8 @@ def main(filevideo, calib_file, model_select, reg_weights, output_path):
             xyxy_ = [int(x) for x in det.xyxy[0]]
             top_left, bottom_right = (xyxy_[0], xyxy_[1]), (xyxy_[2], xyxy_[3])
             bbox = [top_left, bottom_right]
-            label = "pedestrian"
+            #import ipdb; ipdb.set_trace()
+            label = labels_map.get(int(det.cls), "misc")
             # print("bbox2d", bbox, label)
 
             cv2.putText(frame, f"{label} {track_id}", top_left, cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)            
