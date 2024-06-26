@@ -15,39 +15,40 @@ def rotation_matrix(yaw, pitch=0, roll=0):
     # return np.dot(np.dot(Rz,Ry), Rx)
 
 # option to rotate and shift (for label info)
+
+def get_birds_eye_view_bbox(corners_3d):
+    """
+    Extract the bird's eye view bounding box from 3D bounding box corners.
+    
+    Parameters:
+    corners_3d (np.array): An array of shape (8, 3) representing the 8 corners of the 3D bounding box.
+    
+    Returns:
+    np.array: An array of shape (4,) representing the bird's eye view bounding box [min_x, min_y, max_x, max_y].
+    """
+    # Project the 3D corners to 2D by ignoring the z-coordinate
+    corners_2d = corners_3d[:, :2]
+    
+    # Find the minimum and maximum x and y coordinates
+    min_x = np.min(corners_2d[:, 0])
+    max_x = np.max(corners_2d[:, 0])
+    min_y = np.min(corners_2d[:, 1])
+    max_y = np.max(corners_2d[:, 1])
+    
+    # Return the 2D bounding box [min_x, min_y, max_x, max_y]
+    return np.array([min_x, min_y, max_x, max_y])
+
 def create_corners(dimension, location=None, R=None):
-    dx = dimension[2] / 2
-    dy = dimension[0] / 2
-    dz = dimension[1] / 2
+    dx, dy, dz = dimension[2] / 2, dimension[0] / 2, dimension[1] / 2
+    corners = np.array([[dx*i, dy*j, dz*k] for i in [1, -1] for j in [1, -1] for k in [1, -1]])
 
-    x_corners = []
-    y_corners = []
-    z_corners = []
-
-    for i in [1, -1]:
-        for j in [1,-1]:
-            for k in [1,-1]:
-                x_corners.append(dx*i)
-                y_corners.append(dy*j)
-                z_corners.append(dz*k)
-
-    corners = [x_corners, y_corners, z_corners]
-
-    # rotate if R is passed in
     if R is not None:
-        corners = np.dot(R, corners)
+        corners = np.dot(corners, R.T)  # Assuming R is a rotation matrix
 
-    # shift if location is passed in
     if location is not None:
-        for i,loc in enumerate(location):
-            corners[i,:] = corners[i,:] + loc
+        corners += location  # Broadcasting addition to each corner
 
-    final_corners = []
-    for i in range(8):
-        final_corners.append([corners[0][i], corners[1][i], corners[2][i]])
-
-
-    return final_corners
+    return corners
 
 # this is based on the paper. Math!
 # calib is a 3x4 matrix, box_2d is [(xmin, ymin), (xmax, ymax)]

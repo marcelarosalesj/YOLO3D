@@ -79,6 +79,20 @@ def plot_3d_pts(img, pts, center, calib_file=None, cam_to_img=None, relative=Fal
 
 
 def plot_3d_box(img, cam_to_img, ry, dimension, center):
+    """
+    Plot a 3D box on an image.
+
+    Args:
+        img (numpy.ndarray): The input image.
+        cam_to_img (numpy.ndarray): The camera-to-image transformation matrix.
+        ry (float): The rotation angle around the y-axis.
+        dimension (numpy.ndarray): The dimensions of the box (length, width, height).
+        center (numpy.ndarray): The center coordinates of the box.
+
+    Returns:
+        tuple: A tuple containing the corner points of the base side of the box in 3D space.
+
+    """
 
     # plot_3d_pts(img, [center], center, calib_file=calib_file, cam_to_img=cam_to_img)
 
@@ -93,7 +107,6 @@ def plot_3d_box(img, cam_to_img, ry, dimension, center):
     for corner in corners:
         point = project_3d_pt(corner, cam_to_img)
         box_3d.append(point)
-
     #LINE
     cv2.line(img, (box_3d[0][0], box_3d[0][1]), (box_3d[2][0],box_3d[2][1]), cv_colors.GREEN.value, 2)
     cv2.line(img, (box_3d[4][0], box_3d[4][1]), (box_3d[6][0],box_3d[6][1]), cv_colors.GREEN.value, 2)
@@ -112,11 +125,11 @@ def plot_3d_box(img, cam_to_img, ry, dimension, center):
     frame = np.zeros_like(img, np.uint8)
 
     # front side
-    cv2.fillPoly(frame, np.array([[[box_3d[0]], [box_3d[1]], [box_3d[3]], [box_3d[2]]]], dtype=np.int32), cv_colors.BLUE.value)
-
+    cv2.fillPoly(frame, np.array([[[box_3d[0]], [box_3d[1]], [box_3d[5]], [box_3d[4]]]], dtype=np.int32), cv_colors.RED.value)
     alpha = 0.5
     mask = frame.astype(bool)
     img[mask] = cv2.addWeighted(img, alpha, frame, 1 - alpha, 0)[mask]
+    return (corners[0].tolist(), corners[1].tolist(), corners[5].tolist(), corners[4].tolist())
 
 def plot_2d_box(img, box_2d):
     # create a square from the corners

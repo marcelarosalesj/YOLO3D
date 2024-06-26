@@ -6,7 +6,7 @@ import argparse
 import os
 import sys
 from pathlib import Path
-
+import pandas as pd
 import cv2
 import torch
 
@@ -45,7 +45,7 @@ class Bbox:
         self.box_2d = box_2d
         self.detected_class = class_
 
-def plot3d(
+def genFeatures3D(
     img,
     proj_matrix,
     box_2d,
@@ -54,7 +54,26 @@ def plot3d(
     theta_ray,
     img_2d=None
     ):
+    """
+    Generates 3D features based on the input parameters.
 
+    Args:
+        img (numpy.ndarray): The input image.
+        proj_matrix (numpy.ndarray): The projection matrix.
+        box_2d (numpy.ndarray): The 2D bounding box coordinates.
+        dimensions (numpy.ndarray): The dimensions of the object.
+        alpha (float): The alpha value.
+        theta_ray (float): The theta ray value.
+        img_2d (numpy.ndarray, optional): The 2D image to plot the box on. Defaults to None.
+
+    Returns:
+        dict: A dictionary containing the generated 3D features.
+            - 'location' (numpy.ndarray): The location of the object.
+            - 'dimensions' (numpy.ndarray): The dimensions of the object.
+            - 'orient' (float): The orientation of the object.
+            - 'bev_corners' (numpy.ndarray): The corners of the object in bird's eye view.
+
+    """
     # the math! returns X, the corners used for constraint
     location, X = calc_location(dimensions, proj_matrix, box_2d, alpha, theta_ray)
 
@@ -63,9 +82,9 @@ def plot3d(
     if img_2d is not None:
         plot_2d_box(img_2d, box_2d)
 
-    plot_3d_box(img, proj_matrix, orient, dimensions, location) # 3d boxes
+    bev_corners = plot_3d_box(img, proj_matrix, orient, dimensions, location) # 3d boxes
 
-    return location
+    return (location, dimensions, orient, bev_corners)
 
 def parse_opt():
     parser = argparse.ArgumentParser()
@@ -74,7 +93,7 @@ def parse_opt():
     parser.add_argument('--reg_weights', type=str, default='weights/resnet18.pkl', help='Regressor model weights')
     parser.add_argument('--output_path', type=str, default=ROOT / 'runs/track', help='Save output pat')
     parser.add_argument('--video', type=str, default='testvid.mp4', help='Video file path')
-    parser.add_argument('--calib_file', type=str, default=ROOT / 'eval/camera_cal/calib_cam_to_cam.txt', help='Calibration file or path')
+    parser.add_argument('--calib_file', type=str, default=ROOT / 'eval/camera_cal/calib.txt', help='Calibration file or path')
 
     opt = parser.parse_args()
     #opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
@@ -84,7 +103,6 @@ def main(filevideo, calib_file, model_select, reg_weights, output_path):
     model = YOLO('yolov8l.pt')
     video = cv2.VideoCapture(filevideo)
     frames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
-    #frames = 50
     print(f"NUMBER OF FRAMES: {frames}")
     calib = str(calib_file)
 
@@ -103,8 +121,16 @@ def main(filevideo, calib_file, model_select, reg_weights, output_path):
 
     output_video_frames = []
     # Process each frame
+    features3d = {'id': [],
+                'class': [],
+                'location': [],
+                'dimensions': [],
+                'orient': [],
+                'bev_corners': [],
+                'timestamp': []
+            }
     for i in tqdm(range(frames), desc='Processing frames'):
-        print(f'index {i}')
+        #print(f'index {i}')
         ret, frame = video.read()
 
         if not ret:
@@ -139,10 +165,8 @@ def main(filevideo, calib_file, model_select, reg_weights, output_path):
             track_ids = results[0].boxes.id.int().cpu().tolist()
         except Exception as e:
             track_ids = []
-
         for det, track_id in zip(results[0].boxes, track_ids):
-            print(det)
-
+            #print(det)
             # bbox
             xyxy_ = [int(x) for x in det.xyxy[0]]
             top_left, bottom_right = (xyxy_[0], xyxy_[1]), (xyxy_[2], xyxy_[3])
@@ -152,7 +176,6 @@ def main(filevideo, calib_file, model_select, reg_weights, output_path):
             # print("bbox2d", bbox, label)
 
             cv2.putText(frame, f"{label} {track_id}", top_left, cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)            
-            
 
             try: 
                 detectedObject = DetectedObject(frame, label, bbox, calib)
@@ -186,19 +209,26 @@ def main(filevideo, calib_file, model_select, reg_weights, output_path):
             alpha -= np.pi
 
             # plot 3d detection
-            plot3d(frame, proj_matrix, bbox, dim, alpha, theta_ray)
-
+            features = genFeatures3D(frame, proj_matrix, bbox, dim, alpha, theta_ray)
+            features3d['location'] += [features[0]]
+            features3d['dimensions'] += [features[1]]
+            features3d['orient'] += [features[2]]
+            features3d['bev_corners'] += [features[3]]
+            features3d['class'] += [label]
+            features3d['id'] += [track_id]
+            features3d['timestamp'] += [video.get(cv2.CAP_PROP_POS_MSEC)]
+            #print(pd.DataFrame(features3d))
             #cv2.imshow("Person Tracking", frame)
             # Break the loop if 'q' is pressed
             #if cv2.waitKey(1) & 0xFF == ord("q"):
             #    break
-
-        print("Done for img {i}")
+        #print("Done for img {i}")
         #print("saving to", f'{output_path}/testIMG_{i}.png')
         #cv2.imwrite(f'{output_path}/testIMG2_{i}.png', frame)
         output_video_frames.append(frame)
-
+    pd.DataFrame(features3d).to_csv(f'{output_path}/features3d.csv', index=False)
     # Save the output video
+    print(output_path)
     out = cv2.VideoWriter(f'{output_path}/output.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 15, (frame.shape[1], frame.shape[0]))
     for frame in output_video_frames:
         out.write(frame)
