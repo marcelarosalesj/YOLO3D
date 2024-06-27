@@ -1,0 +1,21 @@
+# Matriz para frame 1268
+
+
+# proj matrix, no funciona
+272.23 -208.33 358.41 2215.3 104.39 338.0 290.75 1661.48 -0.28 -0.1 0.96 7.69
+
+
+# Matrix extrinseca, la orientacion se ve bien, pero no dibuja el cuadro
+0.87110303 -0.44595722 0.20567368 0.0 0.4062012 0.88965413 0.20860515 0.0 -0.27600741 -0.09817168 0.95612877 7.69202232
+
+# parque 1080
+# matrix de proyeccion (sin la ultima linea) - si funciona con imagen de parque 1080, es de 3x3 = 12 elementos
+822.0 0.0 960.0 2016.0 0.0 822.0 540.0 1134.0 0.0 0.0 1.0 2.0
+
+
+# parque 360
+# matrix de proyeccion sin la ultima linea
+P_rect_02: 822.0 0.0 320.0 672.0 0.0 822.0 180.0 378.0 0.0 0.0 1.0 2.1
+
+# matrix original de calib_cam_to_cam.txt - default
+7.188560e+02 0.000000e+00 6.071928e+02 4.538225e+01 0.000000e+00 7.188560e+02 1.852157e+02 -1.130887e-01 0.000000e+00 0.000000e+00 1.000000e+00 3.779761e-03

@@ -18,3 +18,29 @@ python tracker.py --output_path=runs/
 
 Aqui encontre informacion adicional sobre motocicleta y autobus
 https://github.com/patrickcho168/3dbb/blob/master/torch_lib/class_averages.txt
+
+## Docker
+
+```
+
+docker build -t yolo3d_tracker -f cfc.Dockerfile
+
+docker run -it --rm -p 80:80 --name tracker --gpus all  yolo3d_tracker
+
+docker image rm yolo3d_tracker:latest
+
+```
+
+
+Inside the container
+```
+docker exec -it tracker bash
+
+export PYTHONPATH=/code; python3.11 tracker/main.py
+```
+
+## API
+
+```
+curl http://localhost:80/
+```
