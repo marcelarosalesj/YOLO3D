@@ -257,17 +257,15 @@ if __name__ == '__main__':
     main(filevideo, args.calib_file, model_select, reg_weights, output_path)
 """
 
-def video_tracker(file_path, weights_file_path, model_name="yolo3d", calib_matrix=""):
+def video_tracker(file_path, weights_file_path, model_name="yolo3d", calib="", output_path="/tmp"):
     print(f"Running {model_name} tracker on {file_path}")
-    cap = cv2.VideoCapture(file_path)
+    video = cv2.VideoCapture(file_path)
     
-    if not cap.isOpened():
+    if not video.isOpened():
         print(f"Error opening video file {file_path}")
         return
-    frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    frames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
     print(f"NUMBER OF FRAMES: {frames}")
-
-    print(f"The calib matrix is -> {calib_matrix}")
 
     model_select="resnet18"  # TODO: add this to API params
 
@@ -276,7 +274,7 @@ def video_tracker(file_path, weights_file_path, model_name="yolo3d", calib_matri
     print(file_path)
     print(weights_file_path)
     print(model_name)
-    print(calib_matrix)
+    print(calib)
     print("========")
     model = YOLO('yolov8l.pt')
 
@@ -284,17 +282,127 @@ def video_tracker(file_path, weights_file_path, model_name="yolo3d", calib_matri
     base_model = model_factory[model_select]
     regressor = regressor_factory[model_select](model=base_model).cuda()
 
-    """
+    # load weight
+    checkpoint = torch.load(reg_weights)
+    regressor.load_state_dict(checkpoint['model_state_dict'])
+    regressor.eval()
 
-    # Read and process each frame
-    while True:
-        ret, frame = cap.read()
+    averages = ClassAverages.ClassAverages()
+    angle_bins = generate_bins(2)
+
+
+    output_video_frames = []
+    # Process each frame
+    features3d = {'id': [],
+                'class': [],
+                'location': [],
+                'dimensions': [],
+                'orient': [],
+                'bev_corners': [],
+                'timestamp': []
+            }
+    for i in tqdm(range(frames), desc='Processing frames'):
+        #print(f'index {i}')
+        ret, frame = video.read()
+
         if not ret:
-            print(f"not ret...")
-            break
-        
-        # Perform some processing on each frame
-        # For demonstration, we'll just print the frame dimensions
-        height, width = frame.shape[:2]
-        print(f"Processing frame with dimensions {width}x{height}")
-    """
+            continue
+
+        labels_map = {
+            0: "pedestrian",
+            #1: "bicycle",
+            1: "cyclist", # changed to cyclist
+            2: "car",
+            3: "motorcycle",
+            5: "bus",
+            #6: "train",
+            6: "tram", # changed to tram
+            7: "truck",
+            #9: "traffic light",
+            #10: "fire hydrant",
+            #11: "stop sign",
+            #12: "parking meter",
+            #13: "bench"
+        }
+        results = model.track(frame, persist=True, tracker='bytetrack.yaml', classes=[*labels_map], verbose=False)
+        # Get result values
+        boxes = results[0].boxes
+        track_ids = []
+        names = results[0].names
+
+        if not boxes.is_track:
+            continue
+
+        try:
+            track_ids = results[0].boxes.id.int().cpu().tolist()
+        except Exception as e:
+            track_ids = []
+        for det, track_id in zip(results[0].boxes, track_ids):
+            #print(det)
+            # bbox
+            xyxy_ = [int(x) for x in det.xyxy[0]]
+            top_left, bottom_right = (xyxy_[0], xyxy_[1]), (xyxy_[2], xyxy_[3])
+            bbox = [top_left, bottom_right]
+            #import ipdb; ipdb.set_trace()
+            label = labels_map.get(int(det.cls), "misc")
+            # print("bbox2d", bbox, label)
+
+            cv2.putText(frame, f"{label} {track_id}", top_left, cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+
+            try:
+                detectedObject = DetectedObject(frame, label, bbox, calib)
+            except Exception as e:
+                print("Could not create the DetectedObject")
+                print(e)
+                continue
+            theta_ray = detectedObject.theta_ray
+            input_img = detectedObject.img
+            proj_matrix = detectedObject.proj_matrix
+            detected_class = label
+
+            input_tensor = torch.zeros([1,3,224,224]).cuda()
+            input_tensor[0,:,:,:] = input_img
+
+            # predict orient, conf, and dim
+            [orient, conf, dim] = regressor(input_tensor)
+            orient = orient.cpu().data.numpy()[0, :, :]
+            conf = conf.cpu().data.numpy()[0, :]
+            dim = dim.cpu().data.numpy()[0, :]
+
+            dim += averages.get_item(detected_class)
+
+            argmax = np.argmax(conf)
+            orient = orient[argmax, :]
+            cos = orient[0]
+            sin = orient[1]
+            alpha = np.arctan2(sin, cos)
+            alpha += angle_bins[argmax]
+            alpha -= np.pi
+
+            # plot 3d detection
+            features = genFeatures3D(frame, proj_matrix, bbox, dim, alpha, theta_ray)
+            features3d['location'] += [features[0]]
+            features3d['dimensions'] += [features[1]]
+            features3d['orient'] += [features[2]]
+            features3d['bev_corners'] += [features[3]]
+            features3d['class'] += [label]
+            features3d['id'] += [track_id]
+            features3d['timestamp'] += [video.get(cv2.CAP_PROP_POS_MSEC)]
+            #print(pd.DataFrame(features3d))
+            #cv2.imshow("Person Tracking", frame)
+            # Break the loop if 'q' is pressed
+            #if cv2.waitKey(1) & 0xFF == ord("q"):
+            #    break
+        #print("Done for img {i}")
+        #print("saving to", f'{output_path}/testIMG_{i}.png')
+        #cv2.imwrite(f'{output_path}/testIMG2_{i}.png', frame)
+        output_video_frames.append(frame)
+    pd.DataFrame(features3d).to_csv(f'{output_path}/features3d.csv', index=False)
+    # Save the output video
+    print(output_path)
+    out = cv2.VideoWriter(f'{output_path}/output.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 15, (frame.shape[1], frame.shape[0]))
+    for frame in output_video_frames:
+        out.write(frame)
+    out.release()
+
+    return f'{output_path}/output.mp4'

@@ -2,6 +2,8 @@ import os
 from fastapi import FastAPI, HTTPException
 from fastapi import FastAPI, File, UploadFile
 from fastapi import FastAPI, status
+from fastapi.responses import FileResponse
+
 from pydantic import BaseModel
 
 import boto3
@@ -130,12 +132,34 @@ async def tracker(params: TrackerParams):
 
         if not model_name:
             model_name = "yolo3d"
-        video_tracker(local_file_path,
-                      weights_local_file_path,
-                      model_name=model_name,
-                      calib_matrix=calib_matrix)
+
+
+        print(f"The calib matrix is -> {calib_matrix}")
+
+        # TODO: this is a workaround, we need to change DetectedObject to use the matrix, not the file
+        txt_to_write = f"P_rect_02: {calib_matrix}"
+        print(f"txt to write {txt_to_write}")
+        calib_file_path = "calib_matrix.txt"
+        with open(calib_file_path, 'w') as file:
+            file.write(txt_to_write)
+
+        print(f"Calibration matrix saved to {calib_file_path}")
+
+        with open(calib_file_path, 'r') as file:
+            content = file.read()
+        print(f"Content of {calib_file_path}:")
+        print(content)
+
+        calib = calib_file_path
+        output_video_path = video_tracker(local_file_path,
+            weights_local_file_path,
+            model_name=model_name,
+            calib=calib
+        )
 
         os.remove(local_file_path)
+
+        return FileResponse(output_video_path, media_type='video/mp4', filename='output.mp4')
 
         return {"status": "success", "filename": filename}
     except NoCredentialsError:
