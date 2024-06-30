@@ -1,0 +1,41 @@
+services:
+  yolo3d_tracker:
+    container_name: tracker
+    build: 
+      context: .
+      dockerfile: cfc.Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+    - localstack
+    networks:
+    - my_network
+    # https://docs.docker.com/compose/gpu-support/
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+  localstack:
+    container_name: localstack
+    image: localstack/localstack:latest
+    ports:
+      - "4566:4566"            # LocalStack Gateway
+      - "4510-4559:4510-4559"  # external services port range
+    environment:
+      - SERVICES=s3
+      - DEFAULT_REGION=us-east-1
+      - EDGE_PORT=4566
+      - DEBUG=1
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    volumes:
+      # https://github.com/localstack/localstack/issues/9963
+      - './localstack:/var/lib/localstack'
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    networks:
+    - my_network
+networks:
+  my_network:
+    driver: bridge

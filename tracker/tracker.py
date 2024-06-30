@@ -28,6 +28,13 @@ from library.Plotting import *
 from script import Model, ClassAverages
 from script.Model import ResNet, ResNet18, VGG11
 
+from typing import Union
+
+from fastapi import FastAPI
+
+app = FastAPI()
+
+
 # model factory to choose model
 model_factory = {
     'resnet': resnet18(pretrained=True),
@@ -101,6 +108,7 @@ def parse_opt():
 
 def main(filevideo, calib_file, model_select, reg_weights, output_path):
     model = YOLO('yolov8l.pt')
+    print(f"processing file {filevideo}")
     video = cv2.VideoCapture(filevideo)
     frames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
     print(f"NUMBER OF FRAMES: {frames}")
@@ -235,7 +243,7 @@ def main(filevideo, calib_file, model_select, reg_weights, output_path):
     out.release()
 
 
-
+"""
 if __name__ == '__main__':
     args = parse_opt()
     filevideo = args.video
@@ -247,3 +255,25 @@ if __name__ == '__main__':
     model_select = args.model_select
     #filevideo, calib_file, model_select, output_path
     main(filevideo, args.calib_file, model_select, reg_weights, output_path)
+"""
+
+def yolo3d_tracker(file_path):
+    # Dummy implementation of yolo3d_tracker
+    print(f"Running yolo3d_tracker on {file_path}")
+    cap = cv2.VideoCapture(file_path)
+    
+    if not cap.isOpened():
+        print(f"Error opening video file {file_path}")
+        return
+
+    # Read and process each frame
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            print(f"not ret...")
+            break
+        
+        # Perform some processing on each frame
+        # For demonstration, we'll just print the frame dimensions
+        height, width = frame.shape[:2]
+        print(f"Processing frame with dimensions {width}x{height}")

@@ -19,15 +19,47 @@ python tracker.py --output_path=runs/
 Aqui encontre informacion adicional sobre motocicleta y autobus
 https://github.com/patrickcho168/3dbb/blob/master/torch_lib/class_averages.txt
 
+
+## Docker compose
+
+```
+docker compose up
+docker compose down --rmi all
+
+# rebuild image
+docker compose up -d --no-deps --build yolo3d_tracker 
+
+# CURL
+
+curl -X GET "http://0.0.0.0/listFiles"
+curl -X POST  http://0.0.0.0:80/uploadFile -L -F "file=@tracker/testvid.mp4"
+curl -X DELETE "http://0.0.0.0/deleteFile?filename=testvid.mp4"
+
+
+curl -X GET "http://0.0.0.0/videos/list"
+curl -X POST  http://0.0.0.0:80/videos/upload -L -F "file=@tracker/testvid.mp4"
+curl -X DELETE "http://0.0.0.0/videos/delete?filename=testvid.mp4"
+
+
+
+aws configure # test, test, us-east-1, json
+aws --endpoint-url=http://localhost:4566 s3 ls s3://my-test-bucket
+
+
+curl -X POST "http://0.0.0.0/run_tracker?filename=testvid.mp4"
+
+```
+
 ## Docker
 
 ```
 
-docker build -t yolo3d_tracker -f cfc.Dockerfile
+docker build -t yolo3d_tracker -f cfc.Dockerfile .
 
 docker run -it --rm -p 80:80 --name tracker --gpus all  yolo3d_tracker
 
 docker image rm yolo3d_tracker:latest
+
 
 ```
 

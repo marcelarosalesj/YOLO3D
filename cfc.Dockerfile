@@ -27,5 +27,4 @@ RUN export PYTHONPATH=$PYTHONPATH:/code:/code
 
 EXPOSE 80
 
-#CMD ["python3.11", "tracker/main.py"]
 CMD ["fastapi", "run", "tracker/app.py", "--port", "80"]
