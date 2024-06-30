@@ -257,7 +257,7 @@ if __name__ == '__main__':
     main(filevideo, args.calib_file, model_select, reg_weights, output_path)
 """
 
-def video_tracker(file_path, model_name="yolo3d"):
+def video_tracker(file_path, weights_file_path, model_name="yolo3d", calib_matrix=""):
     print(f"Running {model_name} tracker on {file_path}")
     cap = cv2.VideoCapture(file_path)
     
@@ -266,6 +266,23 @@ def video_tracker(file_path, model_name="yolo3d"):
         return
     frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     print(f"NUMBER OF FRAMES: {frames}")
+
+    print(f"The calib matrix is -> {calib_matrix}")
+
+    model_select="resnet18"  # TODO: add this to API params
+
+    reg_weights = weights_file_path
+    print("========")
+    print(file_path)
+    print(weights_file_path)
+    print(model_name)
+    print(calib_matrix)
+    print("========")
+    model = YOLO('yolov8l.pt')
+
+    # load model
+    base_model = model_factory[model_select]
+    regressor = regressor_factory[model_select](model=base_model).cuda()
 
     """
 

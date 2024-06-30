@@ -31,19 +31,32 @@ docker compose up -d --no-deps --build tracker
 
 # CURL
 
-curl -X GET "http://0.0.0.0/videos/list"
+curl -X GET "http://0.0.0.0:80/videos/list"
 curl -X POST  http://0.0.0.0:80/videos/upload -L -F "file=@tracker/testvid.mp4"
-curl -X DELETE "http://0.0.0.0/videos/delete?filename=testvid.mp4"
+curl -X DELETE "http://0.0.0.0:80/videos/delete?filename=testvid.mp4"
 
+curl -X GET "http://0.0.0.0:80/weights/list"
+curl -X POST  http://0.0.0.0:80/weights/upload -L -F "file=@weights/resnet18.pkl"
+curl -X DELETE "http://0.0.0.0:80/weights/delete?filename=resnet18.pkl"
 
-
-aws configure # test, test, us-east-1, json
-aws --endpoint-url=http://localhost:4566 s3 ls s3://my-test-bucket
-
-
-curl -X POST "http://0.0.0.0/tracker?filename=testvid.mp4&model_name=yolo3d"
+curl -X POST "http://0.0.0.0:80/tracker" -H "Content-Type: application/json" -d '{
+    "filename": "testvid.mp4",
+    "weights" : "resnet18.pkl",
+    "model_name": "yolo3d",
+    "calib_matrix": "822.0 0.0 320.0 672.0 0.0 822.0 180.0 378.0 0.0 0.0 1.0 2.1"
+}'
 
 ```
+
+## Debug containers
+
+```
+# Curl localstack s3 bucket
+aws configure # test, test, us-east-1, json
+aws --endpoint-url=http://localhost:4566 s3 ls s3://my-test-bucket
+```
+
+
 
 ## Docker
 
