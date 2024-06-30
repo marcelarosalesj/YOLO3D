@@ -257,14 +257,17 @@ if __name__ == '__main__':
     main(filevideo, args.calib_file, model_select, reg_weights, output_path)
 """
 
-def yolo3d_tracker(file_path):
-    # Dummy implementation of yolo3d_tracker
-    print(f"Running yolo3d_tracker on {file_path}")
+def video_tracker(file_path, model_name="yolo3d"):
+    print(f"Running {model_name} tracker on {file_path}")
     cap = cv2.VideoCapture(file_path)
     
     if not cap.isOpened():
         print(f"Error opening video file {file_path}")
         return
+    frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    print(f"NUMBER OF FRAMES: {frames}")
+
+    """
 
     # Read and process each frame
     while True:
@@ -277,3 +280,4 @@ def yolo3d_tracker(file_path):
         # For demonstration, we'll just print the frame dimensions
         height, width = frame.shape[:2]
         print(f"Processing frame with dimensions {width}x{height}")
+    """
