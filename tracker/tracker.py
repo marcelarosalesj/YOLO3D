@@ -33,6 +33,9 @@ from fastapi import FastAPI
 
 app = FastAPI()
 
+models = {
+    "yolov8l": YOLO("yolov8l.pt"),
+}
 
 # model factory to choose model
 model_factory = {
@@ -273,6 +276,7 @@ def main(filevideo, calib_file, model_select, reg_weights, output_path):
         out.write(frame)
     out.release()
 
+
 """
 if __name__ == '__main__':
     args = parse_opt()
@@ -286,6 +290,24 @@ if __name__ == '__main__':
     #filevideo, calib_file, model_select, output_path
     main(filevideo, args.calib_file, model_select, reg_weights, output_path)
 """
+
+labels_map = {
+    0: "pedestrian",
+    # 1: "bicycle",
+    1: "cyclist",  # changed to cyclist
+    2: "car",
+    3: "motorcycle",
+    5: "bus",
+    # 6: "train",
+    6: "tram",  # changed to tram
+    7: "truck",
+    # 9: "traffic light",
+    # 10: "fire hydrant",
+    # 11: "stop sign",
+    # 12: "parking meter",
+    # 13: "bench"
+}
+
 
 def video_tracker(
     file_path,
@@ -310,21 +332,21 @@ def video_tracker(
 
     model_select = "resnet18"  # TODO: add this to API params
 
-    reg_weights = weights_file_path
     print("========")
     print(file_path)
     print(weights_file_path)
     print(model_name)
     print(calib_matrix)
     print("========")
-    model = YOLO("yolov8l.pt")
+
+    model = models["yolov8l"]
 
     # load model
     base_model = model_factory[model_select]
     regressor = regressor_factory[model_select](model=base_model).cuda()
 
     # load weight
-    checkpoint = torch.load(reg_weights)
+    checkpoint = torch.load(weights_file_path)
     regressor.load_state_dict(checkpoint["model_state_dict"])
     regressor.eval()
 
@@ -332,6 +354,7 @@ def video_tracker(
     angle_bins = generate_bins(2)
 
     output_video_frames = []
+
     # Process each frame
     features3d = {
         "id": [],
@@ -343,115 +366,112 @@ def video_tracker(
         "timestamp": [],
     }
 
-    for i in tqdm(range(frames), desc="Processing frames"):
-        # print(f'index {i}')
+    N_SKIP = 3
+    TOTAL_FRAMES_COUNT = frames / N_SKIP
+    lista = range(frames)
+    multiplos_de_3 = [num for num in lista if num % 3 == 0]
+    cantidad_multiplos_de_3 = len(multiplos_de_3)
+
+    print(f" ==== SON IGUALES? {TOTAL_FRAMES_COUNT} ?? {cantidad_multiplos_de_3}")
+    # idx_frame = 0
+
+    for idx_frame in range(frames):
         ret, frame = video.read()
 
-        if not ret:
-            continue
+        if ret and not bool(idx_frame % N_SKIP):
+            current_progress = idx_frame / frames
+            print(f"Progress {current_progress*100:.2f} %")
 
-        labels_map = {
-            0: "pedestrian",
-            # 1: "bicycle",
-            1: "cyclist",  # changed to cyclist
-            2: "car",
-            3: "motorcycle",
-            5: "bus",
-            # 6: "train",
-            6: "tram",  # changed to tram
-            7: "truck",
-            # 9: "traffic light",
-            # 10: "fire hydrant",
-            # 11: "stop sign",
-            # 12: "parking meter",
-            # 13: "bench"
-        }
-        results = model.track(
-            frame,
-            persist=True,
-            tracker="bytetrack.yaml",
-            classes=[*labels_map],
-            verbose=False,
-        )
-
-        # Get result values
-        boxes = results[0].boxes
-        track_ids = []
-        names = results[0].names
-
-        if not boxes.is_track:
-            continue
-
-        try:
-            track_ids = results[0].boxes.id.int().cpu().tolist()
-        except Exception as e:
-            track_ids = []
-        for det, track_id in zip(results[0].boxes, track_ids):
-            xyxy_ = [int(x) for x in det.xyxy[0]]
-            top_left, bottom_right = (xyxy_[0], xyxy_[1]), (xyxy_[2], xyxy_[3])
-            bbox = [top_left, bottom_right]
-            label = labels_map.get(int(det.cls), "misc")
-
-            cv2.putText(
+            results = model.track(
                 frame,
-                f"{label} {track_id}",
-                top_left,
-                cv2.FONT_HERSHEY_SIMPLEX,
-                1,
-                (0, 255, 0),
-                2,
+                persist=True,
+                tracker="bytetrack.yaml",
+                classes=[*labels_map],
+                verbose=False,
             )
 
-            try:
-                detectedObject = DetectedObject(frame, label, bbox, calib_matrix)
-            except Exception as e:
-                print("Could not create the DetectedObject")
-                print(e)
+            # Get result values
+            boxes = results[0].boxes
+            track_ids = []
+            names = results[0].names
+
+            if not boxes.is_track:
                 continue
 
-            theta_ray = detectedObject.theta_ray
-            input_img = detectedObject.img
-            proj_matrix = detectedObject.proj_matrix
-            detected_class = label
+            try:
+                track_ids = results[0].boxes.id.int().cpu().tolist()
+            except Exception as e:
+                track_ids = []
+            for det, track_id in zip(results[0].boxes, track_ids):
+                xyxy_ = [int(x) for x in det.xyxy[0]]
+                top_left, bottom_right = (xyxy_[0], xyxy_[1]), (xyxy_[2], xyxy_[3])
+                bbox = [top_left, bottom_right]
+                label = labels_map.get(int(det.cls), "misc")
 
-            input_tensor = torch.zeros([1, 3, 224, 224]).cuda()
-            input_tensor[0, :, :, :] = input_img
+                cv2.putText(
+                    frame,
+                    f"{label} {track_id}",
+                    top_left,
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    1,
+                    (0, 255, 0),
+                    2,
+                )
 
-            # predict orient, conf, and dim
-            [orient, conf, dim] = regressor(input_tensor)
-            orient = orient.cpu().data.numpy()[0, :, :]
-            conf = conf.cpu().data.numpy()[0, :]
-            dim = dim.cpu().data.numpy()[0, :]
+                try:
+                    detectedObject = DetectedObject(frame, label, bbox, calib_matrix)
+                except Exception as e:
+                    print("Could not create the DetectedObject")
+                    print(e)
+                    continue
 
-            dim += averages.get_item(detected_class)
+                theta_ray = detectedObject.theta_ray
+                input_img = detectedObject.img
+                proj_matrix = detectedObject.proj_matrix
+                detected_class = label
 
-            argmax = np.argmax(conf)
-            orient = orient[argmax, :]
-            cos = orient[0]
-            sin = orient[1]
-            alpha = np.arctan2(sin, cos)
-            alpha += angle_bins[argmax]
-            alpha -= np.pi
+                input_tensor = torch.zeros([1, 3, 224, 224]).cuda()
+                input_tensor[0, :, :, :] = input_img
 
-            # plot 3d detection
-            features = genFeatures3D(frame, proj_matrix, bbox, dim, alpha, theta_ray)
-            features3d["location"] += [features[0]]
-            features3d["dimensions"] += [features[1]]
-            features3d["orient"] += [features[2]]
-            features3d["bev_corners"] += [features[3]]
-            features3d["class"] += [label]
-            features3d["id"] += [track_id]
-            features3d["timestamp"] += [video.get(cv2.CAP_PROP_POS_MSEC)]
-            # print(pd.DataFrame(features3d))
-            # cv2.imshow("Person Tracking", frame)
-            # Break the loop if 'q' is pressed
-            # if cv2.waitKey(1) & 0xFF == ord("q"):
-            #    break
-        # print("Done for img {i}")
-        # print("saving to", f'{output_path}/testIMG_{i}.png')
-        # cv2.imwrite(f'{output_path}/testIMG2_{i}.png', frame)
-        output_video_frames.append(frame)
+                # predict orient, conf, and dim
+                [orient, conf, dim] = regressor(input_tensor)
+                orient = orient.cpu().data.numpy()[0, :, :]
+                conf = conf.cpu().data.numpy()[0, :]
+                dim = dim.cpu().data.numpy()[0, :]
+
+                dim += averages.get_item(detected_class)
+
+                argmax = np.argmax(conf)
+                orient = orient[argmax, :]
+                cos = orient[0]
+                sin = orient[1]
+                alpha = np.arctan2(sin, cos)
+                alpha += angle_bins[argmax]
+                alpha -= np.pi
+
+                # plot 3d detection
+                features = genFeatures3D(
+                    frame, proj_matrix, bbox, dim, alpha, theta_ray
+                )
+                features3d["location"] += [features[0]]
+                features3d["dimensions"] += [features[1]]
+                features3d["orient"] += [features[2]]
+                features3d["bev_corners"] += [features[3]]
+                features3d["class"] += [label]
+                features3d["id"] += [track_id]
+                features3d["timestamp"] += [video.get(cv2.CAP_PROP_POS_MSEC)]
+                # print(pd.DataFrame(features3d))
+                # cv2.imshow("Person Tracking", frame)
+                # Break the loop if 'q' is pressed
+                # if cv2.waitKey(1) & 0xFF == ord("q"):
+                #    break
+            # print("Done for img {i}")
+            # print("saving to", f'{output_path}/testIMG_{i}.png')
+            # cv2.imwrite(f'{output_path}/testIMG2_{i}.png', frame)
+            output_video_frames.append(frame)
+
     pd.DataFrame(features3d).to_csv(f"{output_path}/features3d.csv", index=False)
+    video.release()
 
     # Save the output video
     print(output_path)
