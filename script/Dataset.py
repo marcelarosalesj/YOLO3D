@@ -202,6 +202,18 @@ class Dataset(data.Dataset):
         return label
 
 
+
+def reshape_calib_matrix(calib_matrix: str) -> np.array :
+    """
+    Convert a string with 12 elements into a 3, 4 numpy array
+    """
+    cam_P = calib_matrix.strip().split(' ')
+    cam_P = np.asarray([float(cam_P) for cam_P in cam_P])
+    matrix = np.zeros((3, 4))
+    matrix = cam_P.reshape((3, 4))
+    return matrix
+
+
 class DetectedObject:
     """
     Processing image for NN input
@@ -209,8 +221,9 @@ class DetectedObject:
     def __init__(self, img, detection_class, box_2d, proj_matrix, label=None):
 
         # check if proj_matrix is path
-        if isinstance(proj_matrix, str):
-            proj_matrix = get_P(proj_matrix)
+        #if isinstance(proj_matrix, str):
+        #    proj_matrix = get_P(proj_matrix)
+        proj_matrix = reshape_calib_matrix(proj_matrix)
 
         self.proj_matrix = proj_matrix
         self.theta_ray = self.calc_theta_ray(img, box_2d, proj_matrix)

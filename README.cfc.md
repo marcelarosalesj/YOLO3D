@@ -36,6 +36,13 @@ curl -X POST "http://0.0.0.0:80/tracker" -H "Content-Type: application/json" -d 
 
 ```
 
+
+Rebuild 
+
+```
+docker compose up -d --no-deps --build <service_name>
+```
+
 # Backup notes
 
 **Necesito limpiar las siguientes notas, varias cosas no estan actualizadas**

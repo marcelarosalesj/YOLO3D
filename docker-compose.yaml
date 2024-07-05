@@ -3,7 +3,7 @@ services:
     container_name: tracker
     build: 
       context: .
-      dockerfile: cfc.Dockerfile
+      dockerfile: tracker.Dockerfile
     ports:
       - "80:80"
     depends_on:
@@ -18,6 +18,17 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+  uploader:
+    container_name: uploader
+    build:
+      context: .
+      dockerfile: uploader.Dockerfile
+    ports:
+      - "81:81"
+    depends_on:
+    - localstack
+    networks:
+    - my_network
   localstack:
     container_name: localstack
     image: localstack/localstack:latest
